@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: b-partner-im
+  labels:
+    name: b-partner-im
+spec:
+  selector:
+    matchLabels:
+      name: b-partner-im
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        name: b-partner-im
+    spec:
+      containers:
+        - name: b-partner-im
+          command:
+            - /bin/bash
+            - -c
+            - cp /app/yaml/im.yaml /app/im.yaml;/app/im
+          image: harbor.qsbp.io:80/qsbp/b-partner-im:{{tag}}
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4096Mi
+            requests:
+              cpu: 200m
+              memory: 200Mi
+          ports:
+            - containerPort: 8000
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: localtime
+              mountPath: /etc/localtime
+            - name: partner-im
+              mountPath: /app/yaml
+      restartPolicy: Always
+      volumes:
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+            type: File
+        - name: partner-im
+          configMap:
+            name: partner-im
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: b-partner-im-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: comet
+      port: 80
+      targetPort: 8000
+  selector:
+    name: b-partner-im
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /im/$2
+  name: b-partner-im-ingress
+spec:
+  rules:
+    - host: qsbp.io
+      http:
+        paths:
+          - path: /partner/im(/|$)(.*)
+            backend:
+              serviceName: b-partner-im-service
+              servicePort: 80

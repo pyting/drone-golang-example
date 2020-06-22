@@ -1,0 +1,79 @@
+kind: pipeline
+type: kubernetes
+name: pyting
+metadata:
+  namespace: dev
+
+trigger:
+  event:
+    - tag
+
+steps:
+  - name: restore-cache
+    image: meltwater/drone-cache:v1
+    settings:
+      restore: true
+      access_key:
+        from_secret: minio_access_key
+      secret_key:
+        from_secret: minio_secret_key
+      endpoint: http://minio.p-t4t6c-pipeline.svc.cluster.local:9000
+      bucket: go-cache
+      archive_format: gzip
+      region: us-east-1
+      # 开启cache测试
+      # debug: true
+      # true->minio false->aws s3
+      path_style: true
+      mount:
+        - go_pkg
+
+  - name: build
+    image: golang:1.13
+    environment:
+      GOPROXY: https://goproxy.cn
+      GOPATH: /drone/src/go_pkg
+    commands:
+      - go build .
+
+#  - name: publish
+#    image: plugins/docker:latest
+#    settings:
+#      registry: harbor.qsbp.io:80
+#      insecure: true
+#      username:
+#        from_secret: docker_username
+#      password:
+#        from_secret: docker_password
+#      repo: harbor.qsbp.io:80/qsbp/b-partner-im
+#      tags: ${DRONE_TAG}
+#
+#  - name: deploy
+#    image: danielgormly/drone-plugin-kube
+#    settings:
+#      template: deployment.yaml
+#      namespace: dev
+#      token:
+#        from_secret: kube_token
+#      ca:
+#        from_secret: kube_ca
+#      server: https://192.168.1.68:6443
+
+  - name: rebuild-cache
+    image: meltwater/drone-cache:v1
+    settings:
+      rebuild: true
+      access_key:
+        from_secret: minio_access_key
+      secret_key:
+        from_secret: minio_secret_key
+      endpoint: http://minio.p-t4t6c-pipeline.svc.cluster.local:9000
+      bucket: go-cache
+      archive_format: gzip
+      region: us-east-1
+      # 开启cache测试
+      # debug: true
+      # true->minio false->aws s3
+      path_style: true
+      mount:
+        - go_pkg
